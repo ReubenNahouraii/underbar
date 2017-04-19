@@ -191,6 +191,14 @@
 
   // Determine whether all of the elements match a truth test.
   _.every = function(collection, iterator) {
+    iterator = iterator || _.identity
+    return _.reduce(collection, (isEvery, item) => {
+      if(!isEvery) {
+        return false
+      }
+      return !!iterator(item)
+
+    }, true)
     // TIP: Try re-using reduce() here.
   };
 
@@ -198,6 +206,16 @@
   // provided, provide a default one
   _.some = function(collection, iterator) {
     // TIP: There's a very clever way to re-use every() here.
+    // I don't see how to reuse _.every without altering the declaration
+
+    iterator = iterator || _.identity
+    return _.reduce(collection, (isSome, item) => {
+      if(isSome) {
+        return true
+      }
+      return !!iterator(item)
+
+    }, false)
   };
 
 
@@ -220,11 +238,34 @@
   //     bla: "even more stuff"
   //   }); // obj1 now contains key1, key2, key3 and bla
   _.extend = function(obj) {
+    if(arguments.length < 2)
+      return obj
+
+    let args = Array.from(arguments);
+    _.each(args.slice(1), (propertyObj) => {
+      _.each(propertyObj, (propertyValue, propertyKey) => {
+        obj[propertyKey] = propertyValue
+      })
+    })
+
+    return obj
   };
 
   // Like extend, but doesn't ever overwrite a key that already
   // exists in obj
   _.defaults = function(obj) {
+    if(arguments.length < 2)
+      return obj
+
+    let args = Array.from(arguments);
+    _.each(args.slice(1), (propertyObj) => {
+      _.each(propertyObj, (propertyValue, propertyKey) => {
+        if(!obj.hasOwnProperty(propertyKey))
+          obj[propertyKey] = propertyValue
+      })
+    })
+
+    return obj
   };
 
 
@@ -268,6 +309,13 @@
   // already computed the result for the given argument and return that value
   // instead if possible.
   _.memoize = function(func) {
+    let hashMap = {}
+    return function() {
+      if(hashMap[JSON.stringify(arguments)] === undefined)
+        hashMap[JSON.stringify(arguments)] = func.apply(this, arguments);
+
+      return hashMap[JSON.stringify(arguments)]
+    }
   };
 
   // Delays a function for the given number of milliseconds, and then calls
@@ -277,6 +325,10 @@
   // parameter. For example _.delay(someFunction, 500, 'a', 'b') will
   // call someFunction('a', 'b') after 500ms
   _.delay = function(func, wait) {
+      let args = Array.from(arguments).slice(2)
+    setTimeout(() => {
+      func.apply(this, args)
+    }, wait)
   };
 
 
@@ -289,8 +341,18 @@
   //
   // TIP: This function's test suite will ask that you not modify the original
   // input array. For a tip on how to make a copy of an array, see:
-  // http://mdn.io/Array.prototype.slice
+  // http://mdn.io/Array.prototype.slice()
   _.shuffle = function(array) {
+    let arrayShuffled = array.slice(), randIndex, temp
+    for(let swapIndex = arrayShuffled.length - 1; swapIndex > 0; swapIndex--)
+    {
+      randIndex = Math.floor(Math.random() * (swapIndex + 1))
+      temp = arrayShuffled[swapIndex]
+      arrayShuffled[swapIndex] = arrayShuffled[randIndex]
+      arrayShuffled[randIndex] = temp
+    }
+
+    return arrayShuffled
   };
 
 
@@ -305,6 +367,11 @@
   // Calls the method named by functionOrKey on each value in the list.
   // Note: You will need to learn a bit about .apply to complete this.
   _.invoke = function(collection, functionOrKey, args) {
+    let isFunc = typeof functionOrKey === 'function'
+    return _.map(collection, (value) => {
+      let func = isFunc ? functionOrKey : value[functionOrKey]
+      return func.apply(value, args)
+    })
   };
 
   // Sort the object's values by a criterion produced by an iterator.
@@ -312,6 +379,10 @@
   // of that string. For example, _.sortBy(people, 'name') should sort
   // an array of people by their name.
   _.sortBy = function(collection, iterator) {
+    if(typeof iterator === 'string')
+      return collection.sort((obj1, obj2) => obj1[iterator] > obj2[iterator])
+
+    return collection.sort((obj1, obj2) => iterator(obj1) > iterator(obj2))
   };
 
   // Zip together two or more arrays with elements of the same index
@@ -320,6 +391,22 @@
   // Example:
   // _.zip(['a','b','c','d'], [1,2,3]) returns [['a',1], ['b',2], ['c',3], ['d',undefined]]
   _.zip = function() {
+    let arrOfArrays = Array.from(arguments),
+        arrZipped = [],
+        maxLength = 0
+
+     _.each(arrOfArrays, (arr) => { // find max length of all arrays
+       if(arr.length > maxLength) maxLength = arr.length
+     })
+
+     for(let column = 0; column < maxLength; column++)
+     {
+      arrZipped.push([])
+      for(let row = 0; row < arrOfArrays.length; row++)
+        arrZipped[column].push(arrOfArrays[row][column])
+      }
+
+      return arrZipped
   };
 
   // Takes a multidimensional array and converts it to a one-dimensional array.
@@ -327,16 +414,44 @@
   //
   // Hint: Use Array.isArray to check if something is an array
   _.flatten = function(nestedArray, result) {
+    result = result || []
+
+    _.each(nestedArray, (element) => {
+      if(Array.isArray(element))
+        _.flatten(element, result)
+      else
+        result.push(element)
+    })
+
+    return result
   };
 
   // Takes an arbitrary number of arrays and produces an array that contains
   // every item shared between all the passed-in arrays.
   _.intersection = function() {
+    let arrOfArrays = Array.from(arguments),
+        arrIntersection = [],
+        hashmap = {}
+
+    _.each(arrOfArrays, (arr) => {
+      _.each(arr, (element) => {
+        hashmap[element] = hashmap[element] ? hashmap[element] + 1 : 1
+      })
+    })
+
+    _.each(hashmap, (value, key) => {
+      if(value > 1)
+        arrIntersection.push(key)
+    })
+
+    return arrIntersection
   };
 
   // Take the difference between one array and a number of other arrays.
   // Only the elements present in just the first array will remain.
   _.difference = function(array) {
+    let arrIntersection = _.intersection(array, _.flatten(Array.from(arguments).slice(1)))
+    return _.filter(array, (element) => !_.contains(arrIntersection, element))
   };
 
   // Returns a function, that, when invoked, will only be triggered at most once
@@ -345,5 +460,15 @@
   //
   // Note: This is difficult! It may take a while to implement.
   _.throttle = function(func, wait) {
+    let isRunning = false
+    return function() {
+      if(isRunning)
+       return
+      isRunning = true
+      func() // may take a little longer than wait depending on length of func
+      setTimeout(() => {
+        isRunning = false
+      }, wait)
+    }
   };
 }());
